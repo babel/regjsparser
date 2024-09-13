@@ -1,17 +1,19 @@
 # RegJSParser
 
+> This is a fork of [jviereck/regjsparser](https://github.com/jviereck/regjsparser) with some additional patches. The end goal is to merge these patches upstream.
+
 Parsing the JavaScript's RegExp in JavaScript.
 
 ## Installation
 
 ```bash
-npm install regjsparser
+npm install @babel/regjsparser
 ```
 
 ## Usage
 
 ```js
-var parse = require('regjsparser').parse;
+var parse = require('@babel/regjsparser').parse;
 
 var parseTree = parse('^a'); // /^a/
 console.log(parseTree);
