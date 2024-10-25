@@ -1027,8 +1027,6 @@
           range: [res.range[0] - 1, res.range[1]],
           raw: res[0]
         });
-      } else if (features.unicodeSet && hasUnicodeSetFlag && match('q{')) {
-        return parseClassStringDisjunction();
       }
       return false;
     }
@@ -1471,7 +1469,9 @@
         // NestedClass ::
         //      ...
         //      \ CharacterClassEscape[+U, +V]
-        if (res = parseClassEscape()) {
+        if (match('q{')) {
+          return parseClassStringDisjunction();
+        } else if (res = parseClassEscape()) {
           start = res;
         } else if (res = parseClassSetCharacterEscapedHelper()) {
           return res;

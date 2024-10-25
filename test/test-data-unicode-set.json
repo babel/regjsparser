@@ -1627,5 +1627,11 @@
     "name": "SyntaxError",
     "message": "Invalid set operation in character class at position 3\n    [~~]\n       ^",
     "input": "[~~]"
+  },
+  "\\q{a}": {
+    "type": "error",
+    "name": "SyntaxError",
+    "message": "atomEscape at position 1\n    \\q{a}\n     ^",
+    "input": "\\q{a}"
   }
 }
