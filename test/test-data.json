@@ -38626,5 +38626,29 @@
       11
     ],
     "raw": ".(?!.){2,3}"
+  },
+  "^*": {
+    "type": "error",
+    "name": "SyntaxError",
+    "message": "Expected atom at position 1\n    ^*\n     ^",
+    "input": "^*"
+  },
+  "$+": {
+    "type": "error",
+    "name": "SyntaxError",
+    "message": "Expected atom at position 1\n    $+\n     ^",
+    "input": "$+"
+  },
+  "\\b?": {
+    "type": "error",
+    "name": "SyntaxError",
+    "message": "Expected atom at position 2\n    \\b?\n      ^",
+    "input": "\\b?"
+  },
+  "\\B{1}": {
+    "type": "error",
+    "name": "SyntaxError",
+    "message": "Expected atom at position 2\n    \\B{1}\n      ^",
+    "input": "\\B{1}"
   }
 }
