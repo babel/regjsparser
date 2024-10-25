@@ -567,51 +567,71 @@
     function parseTerm() {
       // Term ::
       //      Anchor
-      //      Anchor Quantifier (see https://github.com/jviereck/regjsparser/issues/130)
       //      Atom
       //      Atom Quantifier
+
+      // Term (Annex B)::
+      //      [~UnicodeMode] QuantifiableAssertion Quantifier (see https://github.com/jviereck/regjsparser/issues/130)
+      //      [~UnicodeMode] ExtendedAtom Quantifier
+
+      // QuantifiableAssertion::
+      //      (?= Disjunction[~UnicodeMode, ~UnicodeSetsMode, ?NamedCaptureGroups] )
+      //      (?! Disjunction[~UnicodeMode, ~UnicodeSetsMode, ?NamedCaptureGroups] ) 
 
       if (pos >= str.length || current('|') || current(')')) {
         return null; /* Means: The term is empty */
       }
 
-      var anchorOrAtom = parseAnchor();
+      var anchor = parseAnchor();
+
+      if (anchor) {
+        var pos_backup = pos;
+        quantifier = parseQuantifier() || false;
+        if (quantifier) {
+          // Annex B
+          if (!isUnicodeMode && anchor.type === "group") {
+            quantifier.body = flattenBody(anchor);
+            // The quantifier contains the anchor. Therefore, the beginning of the
+            // quantifier range is given by the beginning of the anchor.
+            updateRawStart(quantifier, anchor.range[0]);
+            return quantifier;
+          }
+          pos = pos_backup;
+          bail("Expected atom");
+        }
+        return anchor;
+      }
 
       // If there is no Anchor, try to parse an atom.
-      if (!anchorOrAtom) {
-        var atom = parseAtomAndExtendedAtom();
-        var quantifier;
-        if (!atom) {
-          // Check if a quantifier is following. A quantifier without an atom
-          // is an error.
-          var pos_backup = pos
-          quantifier = parseQuantifier() || false;
-          if (quantifier) {
-            pos = pos_backup
-            bail('Expected atom');
-          }
-
-          // If no unicode flag, then try to parse ExtendedAtom -> ExtendedPatternCharacter.
-          //      ExtendedPatternCharacter
-          var res;
-          if (!isUnicodeMode && (res = matchReg(/^\{/))) {
-            atom = createCharacter(res);
-          } else {
-            bail('Expected atom');
-          }
+      var atom = parseAtomAndExtendedAtom();
+      var quantifier;
+      if (!atom) {
+        // Check if a quantifier is following. A quantifier without an atom
+        // is an error.
+        pos_backup = pos;
+        quantifier = parseQuantifier() || false;
+        if (quantifier) {
+          pos = pos_backup;
+          bail("Expected atom");
         }
-        anchorOrAtom = atom;
+
+        // If no unicode flag, then try to parse ExtendedAtom -> ExtendedPatternCharacter.
+        //      ExtendedPatternCharacter
+        var res;
+        if (!isUnicodeMode && (res = matchReg(/^\{/))) {
+          atom = createCharacter(res);
+        } else {
+          bail("Expected atom");
+        }
       }
 
       quantifier = parseQuantifier() || false;
       if (quantifier) {
-        var type = anchorOrAtom.type, behavior = anchorOrAtom.behavior;
+        var type = atom.type, behavior = atom.behavior;
         if (
           type === "group" &&
           (behavior === "negativeLookbehind" ||
-            behavior === "lookbehind" ||
-            (isUnicodeMode &&
-              (behavior === "negativeLookahead" || behavior === "lookahead")))
+            behavior === "lookbehind")
         ) {
           bail(
             "Invalid quantifier",
@@ -620,13 +640,13 @@
             quantifier.range[1]
           );
         }
-        quantifier.body = flattenBody(anchorOrAtom);
+        quantifier.body = flattenBody(atom);
         // The quantifier contains the atom. Therefore, the beginning of the
         // quantifier range is given by the beginning of the atom.
-        updateRawStart(quantifier, anchorOrAtom.range[0]);
+        updateRawStart(quantifier, atom.range[0]);
         return quantifier;
       }
-      return anchorOrAtom;
+      return atom;
     }
 
     function parseGroup(matchA, typeA, matchB, typeB) {
