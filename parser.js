@@ -1394,7 +1394,7 @@
       // that large classes take linear time and don't overflow the call stack.
 
       var contents = [], rangeIndexes = [];
-      var from, to, atom, atomTo, dash, range, i, j;
+      var atom, atomTo, dash, range, i, j;
 
       do {
         atom = parseClassAtom();
@@ -1404,7 +1404,6 @@
 
         if (currentOne('-') && !next(']')) {
           // ClassAtom - ClassAtom ClassContents
-          from = atom.range[0];
           incr();
           dash = createCharacter('-');
 
@@ -1412,10 +1411,9 @@
           if (!atomTo) {
             bail('classAtom');
           }
-          to = pos;
 
           rangeIndexes.push(contents.length);
-          contents.push({ atom: atom, dash: dash, atomTo: atomTo, from: from, to: to });
+          contents.push({ atom: atom, dash: dash, atomTo: atomTo, from: atom.range[0], to: pos });
         } else {
           // ClassAtom
           // ClassAtom NonemptyClassRangesNoDash
