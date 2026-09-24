@@ -2,10 +2,21 @@
 //
 // ==================================================================
 //
-// See ECMA-262 Standard: 15.10.1
+// See ECMA-262 Standard: https://tc39.es/ecma262/#sec-patterns
 //
-// NOTE: The ECMA-262 standard uses the term "Assertion" for /^/. Here the
-//   term "Anchor" is used.
+// The grammar below follows the standard. For brevity, the grammar parameters
+// that are only passed through ([?UnicodeMode], [?UnicodeSetsMode] and
+// [?NamedCaptureGroups]) are omitted; the parameters that guard an
+// alternative ([+UnicodeMode], [~UnicodeSetsMode], ...) or that are set
+// explicitly are kept.
+//
+// NOTE: The standard uses the term "Assertion" for /^/. Here the term
+//   "Anchor" is used, see parseAnchor().
+//
+// NOTE: Without the u and v flags, the parser also accepts the extended
+//   grammar of Annex B, see
+//   https://tc39.es/ecma262/#sec-regular-expressions-patterns
+//   e.g. quantified lookaheads (https://github.com/jviereck/regjsparser/issues/130).
 //
 // Pattern ::
 //      Disjunction
@@ -19,20 +30,19 @@
 //      Alternative Term
 //
 // Term ::
-//      Anchor
-//      Anchor Quantifier (see https://github.com/jviereck/regjsparser/issues/130)
+//      Assertion
 //      Atom
 //      Atom Quantifier
 //
-// Anchor ::
+// Assertion ::
 //      ^
 //      $
-//      \ b
-//      \ B
-//      ( ? = Disjunction )
-//      ( ? ! Disjunction )
-//      ( ? < = Disjunction )
-//      ( ? < ! Disjunction )
+//      \b
+//      \B
+//      (?= Disjunction )
+//      (?! Disjunction )
+//      (?<= Disjunction )
+//      (?<! Disjunction )
 //
 // Quantifier ::
 //      QuantifierPrefix
@@ -42,68 +52,155 @@
 //      *
 //      +
 //      ?
-//      { DecimalDigits }
-//      { DecimalDigits , }
-//      { DecimalDigits , DecimalDigits }
+//      { DecimalDigits[~Sep] }
+//      { DecimalDigits[~Sep] ,}
+//      { DecimalDigits[~Sep] , DecimalDigits[~Sep] }
 //
 // Atom ::
 //      PatternCharacter
 //      .
 //      \ AtomEscape
 //      CharacterClass
-//      ( GroupSpecifier Disjunction )
-//      ( ? : Disjunction )
+//      ( GroupSpecifier? Disjunction )
+//      (? RegularExpressionModifiers : Disjunction )
+//      (? RegularExpressionModifiers - RegularExpressionModifiers : Disjunction )
+//
+// RegularExpressionModifiers ::
+//      [empty]
+//      RegularExpressionModifiers RegularExpressionModifier
+//
+// RegularExpressionModifier :: one of
+//      i m s
+//
+// SyntaxCharacter :: one of
+//      ^ $ \ . * + ? ( ) [ ] { } |
 //
 // PatternCharacter ::
-//      SourceCharacter but not any of: ^ $ \ . * + ? ( ) [ ] { } |
+//      SourceCharacter but not SyntaxCharacter
 //
 // AtomEscape ::
 //      DecimalEscape
 //      CharacterClassEscape
 //      CharacterEscape
-//      k GroupName
+//      [+NamedCaptureGroups] k GroupName
 //
-// CharacterEscape[U] ::
+// CharacterEscape ::
 //      ControlEscape
-//      c ControlLetter
+//      c AsciiLetter
+//      0 [lookahead ∉ DecimalDigit]
 //      HexEscapeSequence
-//      RegExpUnicodeEscapeSequence[?U] (ES6)
-//      IdentityEscape[?U]
+//      RegExpUnicodeEscapeSequence
+//      IdentityEscape
 //
-// ControlEscape ::
-//      one of f n r t v
-// ControlLetter ::
-//      one of
-//          a b c d e f g h i j k l m n o p q r s t u v w x y z
-//          A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+// ControlEscape :: one of
+//      f n r t v
+//
+// GroupSpecifier ::
+//      ? GroupName
+//
+// GroupName ::
+//      < RegExpIdentifierName >
+//
+// RegExpIdentifierName ::
+//      RegExpIdentifierStart
+//      RegExpIdentifierName RegExpIdentifierPart
+//
+// RegExpIdentifierStart ::
+//      IdentifierStartChar
+//      \ RegExpUnicodeEscapeSequence[+UnicodeMode]
+//      [~UnicodeMode] UnicodeLeadSurrogate UnicodeTrailSurrogate
+//
+// RegExpIdentifierPart ::
+//      IdentifierPartChar
+//      \ RegExpUnicodeEscapeSequence[+UnicodeMode]
+//      [~UnicodeMode] UnicodeLeadSurrogate UnicodeTrailSurrogate
+//
+// RegExpUnicodeEscapeSequence ::
+//      [+UnicodeMode] u HexLeadSurrogate \u HexTrailSurrogate
+//      [+UnicodeMode] u HexLeadSurrogate
+//      [+UnicodeMode] u HexTrailSurrogate
+//      [+UnicodeMode] u HexNonSurrogate
+//      [~UnicodeMode] u Hex4Digits
+//      [+UnicodeMode] u{ CodePoint }
+//
+// UnicodeLeadSurrogate ::
+//      any Unicode code point in the inclusive interval from U+D800 to U+DBFF
+//
+// UnicodeTrailSurrogate ::
+//      any Unicode code point in the inclusive interval from U+DC00 to U+DFFF
+//
+// HexLeadSurrogate ::
+//      Hex4Digits but only if the MV of Hex4Digits is in the inclusive interval from 0xD800 to 0xDBFF
+//
+// HexTrailSurrogate ::
+//      Hex4Digits but only if the MV of Hex4Digits is in the inclusive interval from 0xDC00 to 0xDFFF
+//
+// HexNonSurrogate ::
+//      Hex4Digits but only if the MV of Hex4Digits is not in the inclusive interval from 0xD800 to 0xDFFF
 //
 // IdentityEscape ::
-//      SourceCharacter but not c
+//      [+UnicodeMode] SyntaxCharacter
+//      [+UnicodeMode] /
+//      [~UnicodeMode] SourceCharacter but not UnicodeIDContinue
 //
 // DecimalEscape ::
-//      DecimalIntegerLiteral [lookahead ∉ DecimalDigit]
+//      NonZeroDigit DecimalDigits[~Sep]? [lookahead ∉ DecimalDigit]
 //
 // CharacterClassEscape ::
-//      one of d D s S w W
+//      d
+//      D
+//      s
+//      S
+//      w
+//      W
+//      [+UnicodeMode] p{ UnicodePropertyValueExpression }
+//      [+UnicodeMode] P{ UnicodePropertyValueExpression }
+//
+// UnicodePropertyValueExpression ::
+//      UnicodePropertyName = UnicodePropertyValue
+//      LoneUnicodePropertyNameOrValue
+//
+// UnicodePropertyName ::
+//      UnicodePropertyNameCharacters
+//
+// UnicodePropertyNameCharacters ::
+//      UnicodePropertyNameCharacter UnicodePropertyNameCharacters?
+//
+// UnicodePropertyValue ::
+//      UnicodePropertyValueCharacters
+//
+// LoneUnicodePropertyNameOrValue ::
+//      UnicodePropertyValueCharacters
+//
+// UnicodePropertyValueCharacters ::
+//      UnicodePropertyValueCharacter UnicodePropertyValueCharacters?
+//
+// UnicodePropertyValueCharacter ::
+//      UnicodePropertyNameCharacter
+//      DecimalDigit
+//
+// UnicodePropertyNameCharacter ::
+//      AsciiLetter
+//      _
 //
 // CharacterClass ::
-//      [ [lookahead ∉ {^}] ClassContents ]
-//      [ ^ ClassContents ]
+//      [ [lookahead ≠ ^] ClassContents ]
+//      [^ ClassContents ]
 //
 // ClassContents ::
 //      [empty]
-//      [~V] NonemptyClassRanges
-//      [+V] ClassSetExpression
+//      [~UnicodeSetsMode] NonemptyClassRanges
+//      [+UnicodeSetsMode] ClassSetExpression
 //
 // NonemptyClassRanges ::
 //      ClassAtom
 //      ClassAtom NonemptyClassRangesNoDash
-//      ClassAtom - ClassAtom ClassContents
+//      ClassAtom - ClassAtom ClassContents[~UnicodeSetsMode]
 //
 // NonemptyClassRangesNoDash ::
 //      ClassAtom
 //      ClassAtomNoDash NonemptyClassRangesNoDash
-//      ClassAtomNoDash - ClassAtom ClassContents
+//      ClassAtomNoDash - ClassAtom ClassContents[~UnicodeSetsMode]
 //
 // ClassAtom ::
 //      -
@@ -114,41 +211,10 @@
 //      \ ClassEscape
 //
 // ClassEscape ::
-//      DecimalEscape
 //      b
-//      CharacterEscape
+//      [+UnicodeMode] -
 //      CharacterClassEscape
-//
-// GroupSpecifier ::
-//      [empty]
-//      ? GroupName
-//
-// GroupName ::
-//      < RegExpIdentifierName >
-//
-// RegExpIdentifierName ::
-//      RegExpIdentifierStart
-//      RegExpIdentifierName RegExpIdentifierContinue
-//
-// RegExpIdentifierStart ::
-//      UnicodeIDStart
-//      $
-//      _
-//      \ RegExpUnicodeEscapeSequence
-//
-// RegExpIdentifierContinue ::
-//      UnicodeIDContinue
-//      $
-//      _
-//      \ RegExpUnicodeEscapeSequence
-//      <ZWNJ>
-//      <ZWJ>
-//
-// --------------------------------------------------------------
-// NOTE: The following productions refer to the "set notation and
-//       properties of strings" proposal.
-//       https://github.com/tc39/proposal-regexp-set-notation
-// --------------------------------------------------------------
+//      CharacterEscape
 //
 // ClassSetExpression ::
 //      ClassUnion
@@ -171,14 +237,14 @@
 //      ClassSetCharacter - ClassSetCharacter
 //
 // ClassSetOperand ::
-//      ClassSetCharacter
-//      ClassStringDisjunction
 //      NestedClass
+//      ClassStringDisjunction
+//      ClassSetCharacter
 //
 // NestedClass ::
-//      [ [lookahead ≠ ^] ClassContents[+U,+V] ]
-//      [ ^ ClassContents[+U,+V] ]
-//      \ CharacterClassEscape[+U, +V]
+//      [ [lookahead ≠ ^] ClassContents[+UnicodeMode, +UnicodeSetsMode] ]
+//      [^ ClassContents[+UnicodeMode, +UnicodeSetsMode] ]
+//      \ CharacterClassEscape[+UnicodeMode]
 //
 // ClassStringDisjunction ::
 //      \q{ ClassStringDisjunctionContents }
@@ -196,35 +262,18 @@
 //
 // ClassSetCharacter ::
 //      [lookahead ∉ ClassSetReservedDoublePunctuator] SourceCharacter but not ClassSetSyntaxCharacter
-//      \ CharacterEscape[+U]
+//      \ CharacterEscape[+UnicodeMode]
 //      \ ClassSetReservedPunctuator
 //      \b
 //
-// ClassSetReservedDoublePunctuator ::
-//      one of && !! ## $$ %% ** ++ ,, .. :: ;; << == >> ?? @@ ^^ `` ~~
+// ClassSetReservedDoublePunctuator :: one of
+//      && !! ## $$ %% ** ++ ,, .. :: ;; << == >> ?? @@ ^^ `` ~~
 //
-// ClassSetSyntaxCharacter ::
-//      one of ( ) [ ] { } / - \ |
+// ClassSetSyntaxCharacter :: one of
+//      ( ) [ ] { } / - \ |
 //
-// ClassSetReservedPunctuator ::
-//      one of & - ! # % , : ; < = > @ ` ~
-//
-// --------------------------------------------------------------
-// NOTE: The following productions refer to the
-//       "Regular Expression Pattern Modifiers for ECMAScript" proposal.
-//       https://github.com/tc39/proposal-regexp-modifiers
-// --------------------------------------------------------------
-//
-// Atom ::
-//      ( ? RegularExpressionModifiers : Disjunction )
-//      ( ? RegularExpressionModifiers - RegularExpressionModifiers : Disjunction )
-//
-// RegularExpressionModifiers:
-//      [empty]
-//      RegularExpressionModifiers RegularExpressionModifier
-//
-// RegularExpressionModifier:
-//      one of i m s
+// ClassSetReservedPunctuator :: one of
+//      & - ! # % , : ; < = > @ ` ~
 
 "use strict";
 (function() {
