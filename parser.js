@@ -10,9 +10,6 @@
 // alternative ([+UnicodeMode], [~UnicodeSetsMode], ...) or that are set
 // explicitly are kept.
 //
-// NOTE: The standard uses the term "Assertion" for /^/. Here the term
-//   "Anchor" is used, see parseAnchor().
-//
 // NOTE: Without the u and v flags, the parser also accepts the extended
 //   grammar of Annex B, see
 //   https://tc39.es/ecma262/#sec-regular-expressions-patterns
@@ -642,7 +639,7 @@
 
     function parseTerm() {
       // Term ::
-      //      Anchor
+      //      Assertion
       //      Atom
       //      Atom Quantifier
 
@@ -658,27 +655,27 @@
         return null; /* Means: The term is empty */
       }
 
-      var anchor = parseAnchor();
+      var assertion = parseAssertion();
       var quantifier;
-      if (anchor) {
+      if (assertion) {
         var pos_backup = pos;
         quantifier = parseQuantifier() || false;
         if (quantifier) {
           // Annex B
-          if (!isUnicodeMode && anchor.type === "group") {
-            quantifier.body = flattenBody(anchor);
-            // The quantifier contains the anchor. Therefore, the beginning of the
-            // quantifier range is given by the beginning of the anchor.
-            updateRawStart(quantifier, anchor.range[0]);
+          if (!isUnicodeMode && assertion.type === "group") {
+            quantifier.body = flattenBody(assertion);
+            // The quantifier contains the assertion. Therefore, the beginning of the
+            // quantifier range is given by the beginning of the assertion.
+            updateRawStart(quantifier, assertion.range[0]);
             return quantifier;
           }
           pos = pos_backup;
           bail("Expected atom");
         }
-        return anchor;
+        return assertion;
       }
 
-      // If there is no Anchor, try to parse an atom.
+      // If there is no Assertion, try to parse an atom.
       var atom = parseAtomAndExtendedAtom();
       if (!atom) {
         // Check if a quantifier is following. A quantifier without an atom
@@ -756,8 +753,11 @@
       return group;
     }
 
-    function parseAnchor() {
-      // Anchor ::
+    // NOTE: parseAssertion() parses ^ $ \b \B and lookaheads; lookbehinds are
+    //   parsed together with the atoms. In the AST, ^ $ \b and \B are "anchor"
+    //   nodes, and lookarounds are "group" nodes.
+    function parseAssertion() {
+      // Assertion ::
       //      ^
       //      $
       //      \ b
