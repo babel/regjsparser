@@ -2143,5 +2143,11 @@
     "name": "SyntaxError",
     "message": "Invalid range end at position 4: ]\n    [\\:-]\n        ^",
     "input": "[\\:-]"
+  },
+  "[\\B]": {
+    "type": "error",
+    "name": "SyntaxError",
+    "message": "\\B not possible inside of CharacterClass at position 2\n    [\\B]\n      ^",
+    "input": "[\\B]"
   }
 }
